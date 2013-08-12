@@ -187,6 +187,22 @@ def histogram_bins(timeseries):
 
     return False
 
+def ks_test(timeseries):
+    """
+    A timeseries is anomalous if 2 sample Kolmogorov-Smirnof test indicates
+    that data distribution for last 10 minutes is different from last hour
+    """
+
+    hour_ago = time() - 3600
+    ten_minutes_ago = time() - 600
+    reference = scipy.array([x[1] for x in timeseries if x[0] >= hour_ago and x[0] < ten_minutes_ago])
+    probe = scipy.array([x[1] for x in timeseries if x[0] >= ten_minutes_ago])
+    d,p_value = scipy.stats.ks_2samp(reference, probe)
+
+    if p_value < 0.5 and d > 0.5:
+        return True
+    else:
+        return False
 
 def run_selected_algorithm(timeseries):
     """
