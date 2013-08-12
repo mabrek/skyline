@@ -178,7 +178,7 @@ class Analyzer(Thread):
             # Log to Graphite
             if settings.GRAPHITE_HOST != '':
                 host = settings.GRAPHITE_HOST.replace('http://', '')
-                system('echo skyline.analyzer.run_time %.2f %s | nc -w 3 %s 2003' % ((time() - now), now, host))
+                system('echo skyline.analyzer.run_time %.2f %s | nc -q 0 -w 3 %s 2003' % ((time() - now), now, host))
 
             # Check canary metric
             raw_series = self.redis_conn.get(settings.FULL_NAMESPACE + settings.CANARY_METRIC)
@@ -192,8 +192,8 @@ class Analyzer(Thread):
                 logger.info('canary duration   :: %.2f' % time_human)
                 if settings.GRAPHITE_HOST != '':
                     host = settings.GRAPHITE_HOST.replace('http://', '')
-                    system('echo skyline.analyzer.duration %.2f %s | nc -w 3 %s 2003' % (time_human, now, host))
-                    system('echo skyline.analyzer.projected %.2f %s | nc -w 3 %s 2003' % (projected, now, host))
+                    system('echo skyline.analyzer.duration %.2f %s | nc -q 0 -w 3 %s 2003' % (time_human, now, host))
+                    system('echo skyline.analyzer.projected %.2f %s | nc -q 0 -w 3 %s 2003' % (projected, now, host))
 
 
             # Reset counters

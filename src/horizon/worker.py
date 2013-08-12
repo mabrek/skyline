@@ -97,7 +97,7 @@ class Worker(Process):
                 logger.info('queue size at %d' % self.q.qsize())
                 if settings.GRAPHITE_HOST != '':
                     host = settings.GRAPHITE_HOST.replace('http://', '')
-                    system("echo skyline.horizon.queue_size %i %i | nc -w 3 %s 2003" % (self.q.qsize(), now, host))
+                    system("echo skyline.horizon.queue_size %i %i | nc -q 0 -w 3 %s 2003" % (self.q.qsize(), now, host))
 
             except Empty:
                 logger.info('worker queue is empty and timed out')
