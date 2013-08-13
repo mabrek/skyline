@@ -197,12 +197,14 @@ def ks_test(timeseries):
     ten_minutes_ago = time() - 600
     reference = scipy.array([x[1] for x in timeseries if x[0] >= hour_ago and x[0] < ten_minutes_ago])
     probe = scipy.array([x[1] for x in timeseries if x[0] >= ten_minutes_ago])
-    d,p_value = scipy.stats.ks_2samp(reference, probe)
+    ks_d,ks_p_value = scipy.stats.ks_2samp(reference, probe)
 
-    if p_value < 0.5 and d > 0.5:
-        return True
-    else:
-        return False
+    if ks_p_value < 0.05 and ks_d > 0.5:
+        adf = sm.tsa.stattools.adfuller(reference, 10)
+        if  adf[1] < 0.05:
+            return True
+
+    return False
 
 def run_selected_algorithm(timeseries):
     """
