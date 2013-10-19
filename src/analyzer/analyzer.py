@@ -4,13 +4,14 @@ from time import time, sleep
 from threading import Thread
 from collections import defaultdict
 from multiprocessing import Process, Manager, Lock
-from msgpack import Unpacker
+from msgpack import Unpacker, unpackb, packb
 from os import path, kill, getpid, system
 from math import ceil
 import traceback
 import operator
 import settings
 
+from alerters import trigger_alert
 from algorithms import run_selected_algorithm
 from algorithm_exceptions import *
 
@@ -78,11 +79,12 @@ class Analyzer(Thread):
                 unpacker.feed(raw_series)
                 timeseries = list(unpacker)
 
-                anomalous, ensemble, datapoint = run_selected_algorithm(timeseries)
+                anomalous, ensemble, datapoint = run_selected_algorithm(timeseries, metric_name)
 
                 # If it's anomalous, add it to list
                 if anomalous:
-                    metric = [datapoint, metric_name]
+                    base_name = metric_name.replace(settings.FULL_NAMESPACE, '', 1)
+                    metric = [datapoint, base_name]
                     self.anomalous_metrics.append(metric)
 
                     # Get the anomaly breakdown - who returned True?
@@ -92,7 +94,7 @@ class Analyzer(Thread):
                             anomaly_breakdown[algorithm] += 1
 
             # It could have been deleted by the Roomba
-            except AttributeError:
+            except TypeError:
                 exceptions['DeletedByRoomba'] += 1
             except TooShort:
                 exceptions['TooShort'] += 1
@@ -119,6 +121,8 @@ class Analyzer(Thread):
                     self.exceptions[key] = value
                 else:
         	        self.exceptions[key] += value
+
+
 
     def run(self):
         """
@@ -159,6 +163,21 @@ class Analyzer(Thread):
             for p in pids:
                 p.join()
 
+            # Send alerts
+            if settings.ENABLE_ALERTS:
+                for alert in settings.ALERTS:
+                    for metric in self.anomalous_metrics:
+                        if alert[0] in metric[1]:
+                            cache_key = 'last_alert.%s.%s' % (alert[1], metric[1])
+                            try:
+                                last_alert = self.redis_conn.get(cache_key)
+                                if not last_alert:
+                                    self.redis_conn.setex(cache_key, alert[2], packb(metric[0]))
+                                    trigger_alert(alert, metric)
+
+                            except Exception as e:
+                                logger.error("couldn't send alert: %s" % e)
+
             # Write anomalous_metrics to static webapp directory
             filename = path.abspath(path.join(path.dirname( __file__ ), '..', settings.ANOMALY_DUMP))
             with open(filename, 'w') as fh:
@@ -179,6 +198,7 @@ class Analyzer(Thread):
             if settings.GRAPHITE_HOST != '':
                 host = settings.GRAPHITE_HOST.replace('http://', '')
                 system('echo skyline.analyzer.run_time %.2f %s | nc -q 0 -w 3 %s 2003' % ((time() - now), now, host))
+                system('echo skyline.analyzer.total_analyzed %d %s | nc -q 0 -w 3 %s 2003' % ((len(unique_metrics) - sum(self.exceptions.values())), now, host))
 
             # Check canary metric
             raw_series = self.redis_conn.get(settings.FULL_NAMESPACE + settings.CANARY_METRIC)
