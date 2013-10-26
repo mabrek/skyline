@@ -223,7 +223,7 @@ def ks_test(timeseries):
 
     if ks_p_value < 0.05 and ks_d > 0.5:
         _, ljp = sm.stats.diagnostic.acorr_ljungbox(reference)
-        if  ljp[-1] > 0.05:
+        if ljp[-1] > 0.05:
             return True
 
     return False
